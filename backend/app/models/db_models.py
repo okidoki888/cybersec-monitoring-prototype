@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
+from sqlalchemy.orm import relationship
 
 from app.db import Base
 
@@ -14,7 +15,16 @@ class SecurityEventORM(Base):
     category = Column(String, index=True, nullable=False)
     severity = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    alerts = relationship("AlertORM", back_populates="event")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index('ix_events_severity_category', 'severity', 'category'),
+        Index('ix_events_timestamp_severity', 'timestamp', 'severity'),
+    )
 
 
 class UserORM(Base):
@@ -25,7 +35,7 @@ class UserORM(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="viewer", nullable=False)  # viewer | analyst | admin
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class AlertRuleORM(Base):
@@ -37,21 +47,34 @@ class AlertRuleORM(Base):
     severity_filter = Column(String, nullable=True)  # e.g. "high", "critical"
     category_filter = Column(String, nullable=True)  # e.g. "network"
     source_filter = Column(String, nullable=True)  # substring match
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
     created_by = Column(String, nullable=True)  # username
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    alerts = relationship("AlertORM", back_populates="rule")
 
 
 class AlertORM(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    rule_id = Column(Integer, nullable=False, index=True)  # FK to alert_rules
-    event_id = Column(String, nullable=False, index=True)  # FK to security_events
-    status = Column(String, default="open", nullable=False)  # open | investigating | resolved | false_positive
-    assigned_to = Column(String, nullable=True)  # username
+    rule_id = Column(Integer, ForeignKey("alert_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_id = Column(String, ForeignKey("security_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, default="open", nullable=False, index=True)  # open | investigating | resolved | false_positive
+    assigned_to = Column(String, nullable=True, index=True)  # username
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     resolved_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    rule = relationship("AlertRuleORM", back_populates="alerts")
+    event = relationship("SecurityEventORM", back_populates="alerts")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index('ix_alerts_status_created', 'status', 'created_at'),
+        Index('ix_alerts_rule_event', 'rule_id', 'event_id'),
+    )
 
 

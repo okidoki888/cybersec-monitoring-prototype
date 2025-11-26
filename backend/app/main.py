@@ -1,6 +1,11 @@
 import logging
+import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.api import alerts, auth, events
 from app.db import Base, engine, SessionLocal
@@ -13,7 +18,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Cybersecurity Monitoring API")
+
+# CORS configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.include_router(auth.router)
 app.include_router(events.router)
 app.include_router(alerts.router)

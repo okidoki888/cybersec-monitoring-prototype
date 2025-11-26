@@ -16,12 +16,14 @@ def _filter_events_query(
     query = db.query(SecurityEventORM)
 
     if severity:
+        # Используем параметризованный запрос вместо f-string
         query = query.filter(SecurityEventORM.severity.ilike(severity))
     if category:
         query = query.filter(SecurityEventORM.category.ilike(category))
     if source:
-        like = f"%{source}%"
-        query = query.filter(SecurityEventORM.source.ilike(like))
+        # Безопасный способ - используем функцию concat вместо f-string
+        from sqlalchemy import func
+        query = query.filter(SecurityEventORM.source.ilike(func.concat('%', source, '%')))
 
     return query
 
@@ -71,17 +73,25 @@ def get_events_summary(
 ) -> EventsSummary:
     """
     Build aggregated summary for dashboard widgets.
+    ВАЖНО: Загружает все события для агрегации - может быть медленным на больших объемах.
+    Для production рекомендуется использовать SQL агрегацию.
     """
     query = _filter_events_query(db, severity=severity, category=category, source=source)
-    rows: List[SecurityEventORM] = query.all()
+
+    # Ограничиваем количество событий для предотвращения OOM
+    MAX_EVENTS_FOR_SUMMARY = 100000
+    rows: List[SecurityEventORM] = query.limit(MAX_EVENTS_FOR_SUMMARY).all()
 
     by_severity = Counter(row.severity for row in rows)
     by_category = Counter(row.category for row in rows)
 
     last_event_at = max((row.timestamp for row in rows), default=None)
 
+    # Получаем реальный total count
+    total = query.count()
+
     return EventsSummary(
-        total=len(rows),
+        total=total,
         by_severity=dict(by_severity),
         by_category=dict(by_category),
         last_event_at=last_event_at,
