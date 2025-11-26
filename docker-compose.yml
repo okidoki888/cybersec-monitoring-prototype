@@ -1,0 +1,35 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: cybersec
+      POSTGRES_USER: cybersec
+      POSTGRES_PASSWORD: cybersec
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://cybersec:cybersec@db:5432/cybersec
+      EVENTS_FILE: /app/data/initial_events.json
+      # API_KEY: "change-me"  # можно раскомментировать и переопределить
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

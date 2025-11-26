@@ -1,0 +1,10 @@
+[
+  {
+    "id": "e1",
+    "timestamp": "2025-11-26T14:00:00Z",
+    "source": "Firewall",
+    "category": "network",
+    "severity": "high",
+    "description": "Подозрительная активность от IP"
+  }
+]
