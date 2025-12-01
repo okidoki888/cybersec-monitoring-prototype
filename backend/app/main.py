@@ -11,6 +11,7 @@ from app.api import alerts, auth, events
 from app.db import Base, engine, SessionLocal
 from app.models.db_models import AlertORM, AlertRuleORM, SecurityEventORM, UserORM  # noqa: F401 - импорты для создания таблиц
 from app.repositories.event_repo import seed_events_from_file
+from app.repositories.user_repo import seed_default_users
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +49,15 @@ async def on_startup() -> None:
 
     # Create tables if they do not exist yet
     Base.metadata.create_all(bind=engine)
+
+    # Seed default users (one-off on empty table)
+    db = SessionLocal()
+    try:
+        users_created = seed_default_users(db)
+        if users_created:
+            logger.info("Seeded %d default users", users_created)
+    finally:
+        db.close()
 
     # Seed initial events from JSON into DB (one-off on empty table)
     db = SessionLocal()
