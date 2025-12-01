@@ -7,7 +7,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from app.api import alerts, auth, events
+from app.api import alerts, auth, events, mitre
 from app.db import Base, engine, SessionLocal
 from app.models.db_models import AlertORM, AlertRuleORM, SecurityEventORM, UserORM  # noqa: F401 - импорты для создания таблиц
 from app.repositories.event_repo import seed_events_from_file
@@ -41,6 +41,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(auth.router)
 app.include_router(events.router)
 app.include_router(alerts.router)
+app.include_router(mitre.router)
 
 
 @app.on_event("startup")
